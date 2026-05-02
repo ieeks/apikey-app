@@ -13,6 +13,7 @@ const envs = ["prod", "staging", "dev"];
 const maskSecret = (value) => "•".repeat(Math.max(12, String(value || "").length));
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 const STORAGE_KEY = "isla_state_v1";
+const SCREENS = new Set(["workspaces", "secrets"]);
 
 function loadPersistedState() {
   try {
@@ -30,9 +31,10 @@ export function App() {
   const persisted = useMemo(() => loadPersistedState(), []);
   const [locked, setLocked] = useState(true);
   const [lockMode, setLockMode] = useState(() => persisted?.lockMode || "face");
-  const [screen, setScreen] = useState(() => persisted?.screen || "workspaces");
+  const [screen, setScreen] = useState(() => (SCREENS.has(persisted?.screen) ? persisted.screen : "workspaces"));
   const [workspace, setWorkspace] = useState(() => persisted?.workspace || "AI");
   const [secrets, setSecrets] = useState(() => persisted?.secrets || initialSecrets);
+  const [hideSecurityNotice, setHideSecurityNotice] = useState(() => persisted?.hideSecurityNotice || false);
   const [query, setQuery] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState([]);
@@ -243,9 +245,10 @@ export function App() {
       workspace,
       workspaces,
       secrets,
+      hideSecurityNotice,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToPersist));
-  }, [lockMode, screen, workspace, workspaces, secrets]);
+  }, [lockMode, screen, workspace, workspaces, secrets, hideSecurityNotice]);
 
   if (locked) {
     return <LockScreen mode={lockMode} setMode={setLockMode} onUnlock={() => setLocked(false)} />;
@@ -265,7 +268,6 @@ export function App() {
         <nav className="segmented-nav">
           <button className={screen === "workspaces" ? "tab active" : "tab"} onClick={() => setScreen("workspaces")}>Workspaces</button>
           <button className={screen === "secrets" ? "tab active" : "tab"} onClick={() => setScreen("secrets")}>Secrets</button>
-          <button className={screen === "gallery" ? "tab active" : "tab"} onClick={() => setScreen("gallery")}>Wireframe Gallery</button>
         </nav>
 
         <div className="quick-actions">
@@ -280,6 +282,10 @@ export function App() {
         <span>·</span>
         <span>Last copy: {lastCopyLabel}</span>
       </div>
+
+      {!hideSecurityNotice && (
+        <SecurityNotice onDismiss={() => setHideSecurityNotice(true)} />
+      )}
 
       {screen === "workspaces" && (
         <section className="panel">
@@ -463,8 +469,6 @@ export function App() {
         </section>
       )}
 
-      {screen === "gallery" && <WireframeGallery />}
-
       {showEditor && <AddSheet workspaces={workspaces} onClose={() => setShowEditor(false)} onSave={addSecret} />}
       {showWorkspaceSheet && <WorkspaceSheet onClose={() => setShowWorkspaceSheet(false)} onSave={addWorkspace} />}
       {renameTarget && (
@@ -494,6 +498,21 @@ export function App() {
       )}
 
       {toast && <div className={toast.type === "error" ? "toast error" : "toast"}>{toast.message}</div>}
+    </div>
+  );
+}
+
+function SecurityNotice({ onDismiss }) {
+  return (
+    <div className="security-notice" role="note" aria-label="Security notice">
+      <div className="title">Sicherheits-Hinweis (Demo)</div>
+      <div className="small">
+        Secrets werden in dieser Web-Demo <strong>unverschlüsselt</strong> im Browser gespeichert (localStorage) und beim Kopieren in die Zwischenablage gelegt.
+        Verwende dafür keine echten Produktions-Keys.
+      </div>
+      <div className="actions">
+        <button className="dismiss" onClick={onDismiss}>Verstanden</button>
+      </div>
     </div>
   );
 }
@@ -645,30 +664,6 @@ function RenameWorkspaceSheet({ currentName, onClose, onSave }) {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function WireframeGallery() {
-  return (
-    <section className="panel">
-      <h2>Wireframe Variants</h2>
-      <div className="gallery">
-        <Card title="Lock A/B/C/D" text="Face ID, PIN pad, Passphrase, Tap unlock" />
-        <Card title="Workspace A/B/C/D" text="Card grid, list rows, no workspace, recent + workspaces" />
-        <Card title="Secrets A/B/C/D" text="Simple, env tags, active search, category groups" />
-        <Card title="Add/Edit A/B/C/D" text="Full form, bottom sheet, wizard, inline edit" />
-      </div>
-      <p className="meta">Die produktive Hauptnavigation ist in Workspaces und Secrets umgesetzt; diese Gallery dokumentiert alle Hand-off Varianten innerhalb der App.</p>
-    </section>
-  );
-}
-
-function Card({ title, text }) {
-  return (
-    <div className="gallery-card">
-      <strong>{title}</strong>
-      <small>{text}</small>
     </div>
   );
 }

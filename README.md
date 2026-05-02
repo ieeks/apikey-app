@@ -3,6 +3,9 @@
 ## Overview
 Isla is a mobile app (iOS-first) for securely storing, organising and copying API keys and secrets. Users can group secrets into workspaces, tag them by environment (prod / staging / dev), search, bulk-delete and copy to clipboard with a single tap.
 
+## Security note (prototype)
+This repository includes a web prototype (React/Vite). In the current implementation, secret values are stored **unencrypted** in the browser (`localStorage`) and the lock screen is UX-only (not real authentication). Treat the GitHub Pages deployment as a demo and do **not** use real production API keys.
+
 ## About the Design Files
 The files in this bundle are **design references created in HTML** — interactive wireframes showing intended layout, structure and behaviour. They are **not** production code to copy directly. The task is to **recreate these designs in your target codebase** (SwiftUI, React Native, Flutter, etc.) using its established patterns, components and libraries.
 
@@ -236,7 +239,7 @@ All list screens share these features:
 interface Secret {
   id: string
   name: string        // e.g. "OPENAI_API_KEY"
-  value: string       // encrypted at rest
+  value: string       // (design intent) encrypted at rest; current web prototype persists plaintext in localStorage
   env: 'prod' | 'staging' | 'dev' | null
   workspaceId: string
   notes?: string

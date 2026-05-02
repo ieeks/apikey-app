@@ -237,6 +237,27 @@ small, p { color: var(--text-secondary); }
 .primary:disabled { opacity: 0.5; }
 .warn { border: 1px dashed var(--border); border-radius: 14px; background: var(--surface); padding: 10px; }
 
+.security-notice {
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+.security-notice .title { font-weight: 700; }
+.security-notice .small { font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+.security-notice .actions { display: flex; justify-content: flex-end; }
+.security-notice .dismiss {
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 0 10px;
+  font-weight: 600;
+}
+
 .toast {
   position: fixed;
   left: 50%;
