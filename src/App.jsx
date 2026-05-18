@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { signOut } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "./firebase";
 import islaLogo from "./assets/isla-logo.svg";
 
 const initialSecrets = [
@@ -12,29 +15,17 @@ const initialSecrets = [
 const envs = ["prod", "staging", "dev"];
 const maskSecret = (value) => "•".repeat(Math.max(12, String(value || "").length));
 const AUTO_LOCK_MS = 5 * 60 * 1000;
-const STORAGE_KEY = "isla_state_v1";
 const SCREENS = new Set(["workspaces", "secrets"]);
 
-function loadPersistedState() {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-export function App() {
-  const persisted = useMemo(() => loadPersistedState(), []);
+export function App({ user }) {
+  const [vaultLoaded, setVaultLoaded] = useState(false);
   const [locked, setLocked] = useState(true);
-  const [lockMode, setLockMode] = useState(() => persisted?.lockMode || "face");
-  const [screen, setScreen] = useState(() => (SCREENS.has(persisted?.screen) ? persisted.screen : "workspaces"));
-  const [workspace, setWorkspace] = useState(() => persisted?.workspace || "AI");
-  const [secrets, setSecrets] = useState(() => persisted?.secrets || initialSecrets);
-  const [hideSecurityNotice, setHideSecurityNotice] = useState(() => persisted?.hideSecurityNotice || false);
+  const [lockMode, setLockMode] = useState("face");
+  const [screen, setScreen] = useState("workspaces");
+  const [workspace, setWorkspace] = useState("AI");
+  const [secrets, setSecrets] = useState(initialSecrets);
+  const [workspaces, setWorkspaces] = useState([...new Set(initialSecrets.map((item) => item.workspace))]);
+  const [hideSecurityNotice, setHideSecurityNotice] = useState(false);
   const [query, setQuery] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState([]);
@@ -42,16 +33,48 @@ export function App() {
   const [showEditor, setShowEditor] = useState(false);
   const [showWorkspaceSheet, setShowWorkspaceSheet] = useState(false);
   const [renameTarget, setRenameTarget] = useState(null);
+  const [deleteWorkspaceTarget, setDeleteWorkspaceTarget] = useState(null);
   const [toast, setToast] = useState(null);
   const [workspaceQuery, setWorkspaceQuery] = useState("");
   const [lastCopiedAt, setLastCopiedAt] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState({ name: "", value: "", env: "prod" });
   const [revealEditValue, setRevealEditValue] = useState(false);
-  const [deleteWorkspaceTarget, setDeleteWorkspaceTarget] = useState(null);
   const importRef = useRef(null);
 
-  const [workspaces, setWorkspaces] = useState(() => persisted?.workspaces || [...new Set(initialSecrets.map((item) => item.workspace))]);
+  // Load vault from Firestore on login
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, "vaults", user.uid)).then((snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data.workspaces)) setWorkspaces(data.workspaces);
+        if (Array.isArray(data.secrets)) setSecrets(data.secrets);
+        if (data.lockMode) setLockMode(data.lockMode);
+        if (typeof data.hideSecurityNotice === "boolean") setHideSecurityNotice(data.hideSecurityNotice);
+        if (SCREENS.has(data.screen)) setScreen(data.screen);
+        if (data.workspace) setWorkspace(data.workspace);
+      }
+      setVaultLoaded(true);
+    }).catch(() => setVaultLoaded(true));
+  }, [user]);
+
+  // Save vault to Firestore (debounced 800ms after last change)
+  useEffect(() => {
+    if (!vaultLoaded || !user) return;
+    const timer = window.setTimeout(() => {
+      setDoc(doc(db, "vaults", user.uid), {
+        version: 1,
+        lockMode,
+        screen,
+        workspace,
+        workspaces,
+        secrets,
+        hideSecurityNotice,
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [lockMode, screen, workspace, workspaces, secrets, hideSecurityNotice, vaultLoaded, user]);
 
   const visibleSecrets = useMemo(
     () => secrets
@@ -289,18 +312,16 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [showDelete, deleteWorkspaceTarget, renameTarget, showWorkspaceSheet, showEditor, editingId]);
 
-  useEffect(() => {
-    const stateToPersist = {
-      version: 1,
-      lockMode,
-      screen,
-      workspace,
-      workspaces,
-      secrets,
-      hideSecurityNotice,
-    };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToPersist));
-  }, [lockMode, screen, workspace, workspaces, secrets, hideSecurityNotice]);
+  if (!vaultLoaded) {
+    return (
+      <div className="app auth-wrap">
+        <div className="auth-card">
+          <img src={islaLogo} alt="Isla" className="auth-logo" />
+          <p className="auth-hint">Vault wird geladen…</p>
+        </div>
+      </div>
+    );
+  }
 
   if (locked) {
     return <LockScreen mode={lockMode} setMode={setLockMode} onUnlock={() => setLocked(false)} />;
@@ -325,6 +346,7 @@ export function App() {
         <div className="quick-actions">
           <button className="quick" aria-label="Create new secret" onClick={() => setShowEditor(true)}>+ Secret</button>
           <button className="quick" aria-label="Create new workspace" onClick={() => setShowWorkspaceSheet(true)}>+ Workspace</button>
+          <button className="quick signout-btn" aria-label="Sign out" onClick={() => signOut(auth)}>↩</button>
         </div>
       </header>
       <div className="context-bar">
@@ -333,6 +355,8 @@ export function App() {
         <span>{currentWorkspaceCount} secrets</span>
         <span>·</span>
         <span>Last copy: {lastCopyLabel}</span>
+        <span>·</span>
+        <span className="user-email">{user.email}</span>
       </div>
 
       {!hideSecurityNotice && (
@@ -520,7 +544,7 @@ export function App() {
                             <strong>{item.name}</strong>
                             <span className={`env ${item.env}`}>{item.env}</span>
                           </div>
-                      <small>{maskSecret(item.value)}</small>
+                          <small>{maskSecret(item.value)}</small>
                         </>
                       )}
                     </div>
@@ -531,7 +555,7 @@ export function App() {
                       </div>
                     ) : (
                       <div className="edit-actions">
-                    <button className="copy" aria-label={`Copy secret value for ${item.name}`} onClick={() => onCopy(item.value)}>Copy</button>
+                        <button className="copy" aria-label={`Copy secret value for ${item.name}`} onClick={() => onCopy(item.value)}>Copy</button>
                         <button className="copy" aria-label={`Edit secret ${item.name}`} onClick={() => startEdit(item)}>Edit</button>
                       </div>
                     )}

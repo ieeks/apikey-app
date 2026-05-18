@@ -2,9 +2,19 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "./App";
 
+vi.mock("./firebase", () => ({ auth: {}, db: {} }));
+vi.mock("firebase/auth", () => ({ signOut: vi.fn() }));
+vi.mock("firebase/firestore", () => ({
+  doc: vi.fn(),
+  getDoc: vi.fn(() => Promise.resolve({ exists: () => false })),
+  setDoc: vi.fn(() => Promise.resolve()),
+}));
+
+const fakeUser = { uid: "test-uid", email: "test@example.com" };
+
 async function unlockApp() {
-  const unlockButton = screen.getByRole("button", { name: "🔓" });
-  await userEvent.click(unlockButton);
+  await screen.findByRole("button", { name: "🔓" });
+  await userEvent.click(screen.getByRole("button", { name: "🔓" }));
 }
 
 describe("critical flows", () => {
@@ -14,7 +24,7 @@ describe("critical flows", () => {
   });
 
   test("add secret creates item in selected workspace", async () => {
-    render(<App />);
+    render(<App user={fakeUser} />);
     await unlockApp();
 
     await userEvent.click(screen.getByRole("button", { name: "Secrets" }));
@@ -31,7 +41,7 @@ describe("critical flows", () => {
   });
 
   test("rename workspace updates workspace card", async () => {
-    render(<App />);
+    render(<App user={fakeUser} />);
     await unlockApp();
 
     await userEvent.click(screen.getByRole("button", { name: "Workspaces" }));
@@ -46,7 +56,7 @@ describe("critical flows", () => {
   });
 
   test("copy uses secret value", async () => {
-    render(<App />);
+    render(<App user={fakeUser} />);
     await unlockApp();
 
     await userEvent.click(screen.getByRole("button", { name: "Secrets" }));
@@ -65,7 +75,7 @@ describe("critical flows", () => {
   });
 
   test("delete removes selected secrets", async () => {
-    render(<App />);
+    render(<App user={fakeUser} />);
     await unlockApp();
 
     await userEvent.click(screen.getByRole("button", { name: "Secrets" }));
