@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
@@ -113,14 +113,6 @@ export function App({ user }) {
     [secrets, workspace, query]
   );
 
-  const grouped = useMemo(() => {
-    const map = {};
-    for (const item of visibleSecrets) {
-      map[item.category] ??= [];
-      map[item.category].push(item);
-    }
-    return map;
-  }, [visibleSecrets]);
 
   const recentSecrets = useMemo(() => secrets.slice(-4).reverse(), [secrets]);
   const filteredWorkspaces = useMemo(() => {
@@ -263,7 +255,7 @@ export function App({ user }) {
     showToast("Secret updated", "success");
   };
 
-  const addSecret = ({ name, value, env, workspaceName, category }) => {
+  const addSecret = ({ name, value, env, workspaceName }) => {
     if (!name.trim() || !value.trim()) {
       showToast("Name and value are required", "error");
       return;
@@ -272,8 +264,7 @@ export function App({ user }) {
       showToast("Workspace is required", "error");
       return;
     }
-    const resolvedCategory = category.trim().toUpperCase() || "GENERAL";
-    setSecrets((prev) => [...prev, { id: Date.now(), name, value, env, workspace: workspaceName, category: resolvedCategory }]);
+    setSecrets((prev) => [...prev, { id: Date.now(), name, value, env, workspace: workspaceName }]);
     setWorkspaces((prev) => (prev.includes(workspaceName) ? prev : [...prev, workspaceName]));
     setWorkspace(workspaceName);
     setShowEditor(false);
@@ -538,69 +529,64 @@ export function App({ user }) {
                 <small>Add your first secret for this workspace.</small>
               </div>
             )}
-            {Object.entries(grouped).map(([category, items]) => (
-              <React.Fragment key={category}>
-                <label className="label">{category}</label>
-                {items.map((item) => (
-                  <div key={item.id} className={selected.includes(item.id) ? "secret-row selected" : "secret-row"}>
-                    {selectMode && (
-                      <button className={selected.includes(item.id) ? "check on" : "check"} aria-label={`Select secret ${item.name}`} onClick={() => toggleSelection(item.id)} />
-                    )}
-                    <div className="grow" onClick={() => selectMode && toggleSelection(item.id)}>
-                      {editingId === item.id ? (
-                        <div className="edit-wrap">
-                          <input className="input compact" value={editDraft.name} onChange={(event) => setEditDraft((prev) => ({ ...prev, name: event.target.value }))} />
-                          <div className="secure-input-row">
-                            <input
-                              className="input compact"
-                              type={revealEditValue ? "text" : "password"}
-                              value={editDraft.value}
-                              onChange={(event) => setEditDraft((prev) => ({ ...prev, value: event.target.value }))}
-                              aria-label={`Edit secret value for ${item.name}`}
-                            />
-                            <button
-                              className="copy"
-                              aria-label="Reveal secret value for 8 seconds"
-                              onClick={() => {
-                                setRevealEditValue(true);
-                                window.setTimeout(() => setRevealEditValue(false), 8000);
-                              }}
-                            >
-                              Reveal 8s
-                            </button>
-                          </div>
-                          <div className="row env-row">
-                            {envs.map((env) => (
-                              <button key={env} className={editDraft.env === env ? "chip active" : "chip"} onClick={() => setEditDraft((prev) => ({ ...prev, env }))}>
-                                {env}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="row">
-                            <strong>{item.name}</strong>
-                            <span className={`env ${item.env}`}>{item.env}</span>
-                          </div>
-                          <small>{maskSecret(item.value)}</small>
-                        </>
-                      )}
+            {visibleSecrets.map((item) => (
+              <div key={item.id} className={selected.includes(item.id) ? "secret-row selected" : "secret-row"}>
+                {selectMode && (
+                  <button className={selected.includes(item.id) ? "check on" : "check"} aria-label={`Select secret ${item.name}`} onClick={() => toggleSelection(item.id)} />
+                )}
+                <div className="grow" onClick={() => selectMode && toggleSelection(item.id)}>
+                  {editingId === item.id ? (
+                    <div className="edit-wrap">
+                      <input className="input compact" value={editDraft.name} onChange={(event) => setEditDraft((prev) => ({ ...prev, name: event.target.value }))} />
+                      <div className="secure-input-row">
+                        <input
+                          className="input compact"
+                          type={revealEditValue ? "text" : "password"}
+                          value={editDraft.value}
+                          onChange={(event) => setEditDraft((prev) => ({ ...prev, value: event.target.value }))}
+                          aria-label={`Edit secret value for ${item.name}`}
+                        />
+                        <button
+                          className="copy"
+                          aria-label="Reveal secret value for 8 seconds"
+                          onClick={() => {
+                            setRevealEditValue(true);
+                            window.setTimeout(() => setRevealEditValue(false), 8000);
+                          }}
+                        >
+                          Reveal 8s
+                        </button>
+                      </div>
+                      <div className="row env-row">
+                        {envs.map((env) => (
+                          <button key={env} className={editDraft.env === env ? "chip active" : "chip"} onClick={() => setEditDraft((prev) => ({ ...prev, env }))}>
+                            {env}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    {editingId === item.id ? (
-                      <div className="edit-actions">
-                        <button className="copy" onClick={() => { setEditingId(null); setRevealEditValue(false); }}>Cancel</button>
-                        <button className="primary small" onClick={() => saveEdit(item.id)}>Save</button>
+                  ) : (
+                    <>
+                      <div className="row">
+                        <strong>{item.name}</strong>
+                        <span className={`env ${item.env}`}>{item.env}</span>
                       </div>
-                    ) : (
-                      <div className="edit-actions">
-                        <button className="copy" aria-label={`Copy secret value for ${item.name}`} onClick={() => onCopy(item.value)}>Copy</button>
-                        <button className="copy" aria-label={`Edit secret ${item.name}`} onClick={() => startEdit(item)}>Edit</button>
-                      </div>
-                    )}
+                      <small>{maskSecret(item.value)}</small>
+                    </>
+                  )}
+                </div>
+                {editingId === item.id ? (
+                  <div className="edit-actions">
+                    <button className="copy" onClick={() => { setEditingId(null); setRevealEditValue(false); }}>Cancel</button>
+                    <button className="primary small" onClick={() => saveEdit(item.id)}>Save</button>
                   </div>
-                ))}
-              </React.Fragment>
+                ) : (
+                  <div className="edit-actions">
+                    <button className="copy" aria-label={`Copy secret value for ${item.name}`} onClick={() => onCopy(item.value)}>Copy</button>
+                    <button className="copy" aria-label={`Edit secret ${item.name}`} onClick={() => startEdit(item)}>Edit</button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
 
@@ -675,14 +661,11 @@ function LockScreen({ user, onUnlock }) {
   );
 }
 
-const PRESET_CATEGORIES = ["AI", "PAYMENTS", "INFRASTRUCTURE", "DATABASE", "AUTH"];
-
 function AddSheet({ workspaces, onClose, onSave }) {
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
   const [env, setEnv] = useState("prod");
   const [workspaceName, setWorkspaceName] = useState(workspaces[0] || "");
-  const [category, setCategory] = useState("AI");
   const [revealValue, setRevealValue] = useState(false);
   const sheetRef = useSwipeClose(onClose);
 
@@ -711,18 +694,11 @@ function AddSheet({ workspaces, onClose, onSave }) {
         <div className="row env-row">
           {envs.map((item) => <button key={item} className={env === item ? "chip active" : "chip"} onClick={() => setEnv(item)}>{item}</button>)}
         </div>
-        <label className="label">CATEGORY</label>
-        <div className="chip-wrap">
-          {PRESET_CATEGORIES.map((item) => (
-            <button key={item} className={category === item ? "chip active" : "chip"} onClick={() => setCategory(item)}>{item}</button>
-          ))}
-        </div>
-        <input className="input" placeholder="Custom category…" value={PRESET_CATEGORIES.includes(category) ? "" : category} onChange={(event) => setCategory(event.target.value)} aria-label="Custom category" />
         <label className="label">WORKSPACE</label>
         <input className="input" value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} aria-label="Workspace for secret" />
         <div className="row-buttons">
           <button className="outline" onClick={onClose}>Cancel</button>
-          <button className="primary" onClick={() => onSave({ name, value, env, workspaceName, category })} disabled={!name || !value}>Save Secret</button>
+          <button className="primary" onClick={() => onSave({ name, value, env, workspaceName })} disabled={!name || !value}>Save Secret</button>
         </div>
       </div>
     </div>
