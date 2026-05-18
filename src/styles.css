@@ -303,6 +303,19 @@ small, p { color: var(--text-secondary); }
   100% { opacity: 0; transform: translate(-50%, 0); }
 }
 
+@media (min-width: 641px) {
+  .overlay {
+    align-items: center;
+    justify-items: center;
+  }
+  .sheet {
+    border-radius: 22px;
+    max-width: 480px;
+    width: 100%;
+    padding-bottom: 16px;
+  }
+}
+
 @media (max-width: 640px) {
   .workspace-grid, .gallery { grid-template-columns: 1fr; }
   .header { flex-direction: column; align-items: flex-start; }
