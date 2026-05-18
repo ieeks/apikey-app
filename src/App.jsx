@@ -5,15 +5,35 @@ import { auth, db } from "./firebase";
 import islaLogo from "./assets/isla-logo.svg";
 
 function useSwipeClose(onClose, threshold = 72) {
+  const ref = useRef(null);
   const startY = useRef(null);
-  return {
-    onTouchStart: (e) => { startY.current = e.touches[0].clientY; },
-    onTouchEnd: (e) => {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onStart = (e) => { startY.current = e.touches[0].clientY; };
+    const onMove = (e) => {
       if (startY.current === null) return;
-      if (e.changedTouches[0].clientY - startY.current > threshold) onClose();
+      if (e.touches[0].clientY - startY.current > 0) e.preventDefault();
+    };
+    const onEnd = (e) => {
+      if (startY.current === null) return;
+      if (e.changedTouches[0].clientY - startY.current > threshold) onCloseRef.current();
       startY.current = null;
-    },
-  };
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+    };
+  }, [threshold]);
+
+  return ref;
 }
 
 const initialSecrets = [
@@ -53,8 +73,6 @@ export function App({ user }) {
   const [revealEditValue, setRevealEditValue] = useState(false);
   const clipboardClearRef = useRef(null);
   const importRef = useRef(null);
-  const deleteSwipeY = useRef(null);
-  const deleteWsSwipeY = useRef(null);
 
   // Load vault from Firestore on login
   useEffect(() => {
@@ -365,7 +383,10 @@ export function App({ user }) {
         <div className="quick-actions">
           <button className="quick" aria-label="Create new secret" onClick={() => setShowEditor(true)}>+ Secret</button>
           <button className="quick" aria-label="Create new workspace" onClick={() => setShowWorkspaceSheet(true)}>+ Workspace</button>
-          <button className="quick signout-btn" aria-label="Sign out" onClick={() => signOut(auth)}>↩</button>
+          <button className="quick signout-btn" aria-label="Sign out" onClick={() => signOut(auth)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sign out
+          </button>
         </div>
       </header>
       <div className="context-bar">
@@ -599,41 +620,16 @@ export function App({ user }) {
       )}
 
       {showDelete && (
-        <div className="overlay" onClick={() => setShowDelete(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => { deleteSwipeY.current = e.touches[0].clientY; }} onTouchEnd={(e) => { if (e.changedTouches[0].clientY - deleteSwipeY.current > 72) setShowDelete(false); }}>
-            <div className="handle" />
-            <h3>Delete {selected.length} Secret(s)?</h3>
-            <p>This action cannot be undone.</p>
-            <div className="warn">
-              <strong>Security Protocol</strong>
-              <p>Deleting these secrets is permanent. Ensure you have backups or rotated keys before confirming.</p>
-            </div>
-            <div className="row-buttons">
-              <button className="outline" onClick={() => setShowDelete(false)}>Cancel</button>
-              <button className="primary" onClick={deleteSelected}>Delete</button>
-            </div>
-          </div>
-        </div>
+        <DeleteSecretsSheet count={selected.length} onClose={() => setShowDelete(false)} onConfirm={deleteSelected} />
       )}
 
       {deleteWorkspaceTarget && (
-        <div className="overlay" onClick={() => setDeleteWorkspaceTarget(null)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => { deleteWsSwipeY.current = e.touches[0].clientY; }} onTouchEnd={(e) => { if (e.changedTouches[0].clientY - deleteWsSwipeY.current > 72) setDeleteWorkspaceTarget(null); }}>
-            <div className="handle" />
-            <h3>Delete "{deleteWorkspaceTarget}"?</h3>
-            <p>
-              This will permanently delete the workspace and all{" "}
-              {secrets.filter((item) => item.workspace === deleteWorkspaceTarget).length} secret(s) inside it.
-            </p>
-            <div className="warn">
-              <strong>Cannot be undone</strong>
-              <p>Export your vault first if you want a backup.</p>
-            </div>
-            <div className="row-buttons">
-              <button className="outline" onClick={() => setDeleteWorkspaceTarget(null)}>Cancel</button>
-              <button className="primary" onClick={() => deleteWorkspace(deleteWorkspaceTarget)}>Delete</button>
-            </div>
-          </div>
+        <DeleteWorkspaceSheet
+          name={deleteWorkspaceTarget}
+          secretCount={secrets.filter((item) => item.workspace === deleteWorkspaceTarget).length}
+          onClose={() => setDeleteWorkspaceTarget(null)}
+          onConfirm={() => deleteWorkspace(deleteWorkspaceTarget)}
+        />
         </div>
       )}
 
@@ -690,11 +686,11 @@ function AddSheet({ workspaces, onClose, onSave }) {
   const [workspaceName, setWorkspaceName] = useState(workspaces[0] || "");
   const [category, setCategory] = useState("AI");
   const [revealValue, setRevealValue] = useState(false);
-  const swipe = useSwipeClose(onClose);
+  const sheetRef = useSwipeClose(onClose);
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={(event) => event.stopPropagation()} {...swipe}>
+      <div className="sheet" ref={sheetRef} onClick={(event) => event.stopPropagation()}>
         <div className="handle" />
         <h3>New Secret</h3>
         <label className="label">NAME</label>
@@ -737,11 +733,11 @@ function AddSheet({ workspaces, onClose, onSave }) {
 
 function WorkspaceSheet({ onClose, onSave }) {
   const [workspaceName, setWorkspaceName] = useState("");
-  const swipe = useSwipeClose(onClose);
+  const sheetRef = useSwipeClose(onClose);
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={(event) => event.stopPropagation()} {...swipe}>
+      <div className="sheet" ref={sheetRef} onClick={(event) => event.stopPropagation()}>
         <div className="handle" />
         <h3>New Workspace</h3>
         <label className="label">WORKSPACE NAME</label>
@@ -757,11 +753,11 @@ function WorkspaceSheet({ onClose, onSave }) {
 
 function RenameWorkspaceSheet({ currentName, onClose, onSave }) {
   const [nextName, setNextName] = useState(currentName);
-  const swipe = useSwipeClose(onClose);
+  const sheetRef = useSwipeClose(onClose);
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={(event) => event.stopPropagation()} {...swipe}>
+      <div className="sheet" ref={sheetRef} onClick={(event) => event.stopPropagation()}>
         <div className="handle" />
         <h3>Rename Workspace</h3>
         <label className="label">CURRENT</label>
@@ -773,6 +769,48 @@ function RenameWorkspaceSheet({ currentName, onClose, onSave }) {
           <button className="primary" onClick={() => onSave(currentName, nextName)} disabled={!nextName.trim()}>
             Save Name
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteSecretsSheet({ count, onClose, onConfirm }) {
+  const sheetRef = useSwipeClose(onClose);
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" ref={sheetRef} onClick={(e) => e.stopPropagation()}>
+        <div className="handle" />
+        <h3>Delete {count} Secret(s)?</h3>
+        <p>This action cannot be undone.</p>
+        <div className="warn">
+          <strong>Security Protocol</strong>
+          <p>Deleting these secrets is permanent. Ensure you have backups or rotated keys before confirming.</p>
+        </div>
+        <div className="row-buttons">
+          <button className="outline" onClick={onClose}>Cancel</button>
+          <button className="primary" onClick={onConfirm}>Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteWorkspaceSheet({ name, secretCount, onClose, onConfirm }) {
+  const sheetRef = useSwipeClose(onClose);
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" ref={sheetRef} onClick={(e) => e.stopPropagation()}>
+        <div className="handle" />
+        <h3>Delete "{name}"?</h3>
+        <p>This will permanently delete the workspace and all {secretCount} secret(s) inside it.</p>
+        <div className="warn">
+          <strong>Cannot be undone</strong>
+          <p>Export your vault first if you want a backup.</p>
+        </div>
+        <div className="row-buttons">
+          <button className="outline" onClick={onClose}>Cancel</button>
+          <button className="primary" onClick={onConfirm}>Delete</button>
         </div>
       </div>
     </div>

@@ -172,7 +172,7 @@ input:focus-visible,
   justify-content: center;
 }
 .google-btn:hover { border-color: var(--text); }
-.signout-btn { font-size: 16px; padding: 0 8px; }
+.signout-btn { display: flex; align-items: center; gap: 6px; }
 .user-email { margin-left: auto; font-size: 11px; color: var(--text-secondary); }
 .muted-meta { font-size: 11px; color: var(--text-secondary); }
 
@@ -263,7 +263,6 @@ small, p { color: var(--text-secondary); }
   display: grid;
   gap: 10px;
   overscroll-behavior: contain;
-  touch-action: pan-y;
   max-height: 92dvh;
   overflow-y: auto;
 }
