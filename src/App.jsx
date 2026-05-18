@@ -625,13 +625,12 @@ export function App({ user }) {
 function SecurityNotice({ onDismiss }) {
   return (
     <div className="security-notice" role="note" aria-label="Security notice">
-      <div className="title">Sicherheits-Hinweis (Demo)</div>
+      <div className="title">Security notice</div>
       <div className="small">
-        Secrets werden in dieser Web-Demo <strong>unverschlüsselt</strong> im Browser gespeichert (localStorage) und beim Kopieren in die Zwischenablage gelegt.
-        Verwende dafür keine echten Produktions-Keys.
+        Secret values are stored <strong>unencrypted</strong> in Firestore. Avoid storing real production keys.
       </div>
       <div className="actions">
-        <button className="dismiss" onClick={onDismiss}>Verstanden</button>
+        <button className="dismiss" onClick={onDismiss}>Got it</button>
       </div>
     </div>
   );
