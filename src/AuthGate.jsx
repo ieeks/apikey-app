@@ -5,7 +5,7 @@ import islaLogo from "./assets/isla-logo.svg";
 
 // Add every Google email address that should have access.
 export const ALLOWED_EMAILS = [
-  "REPLACE_WITH_YOUR_EMAIL@gmail.com",
+  "manuel.koblischek@gmail.com",
 ];
 
 export function AuthGate({ children }) {
