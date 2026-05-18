@@ -329,7 +329,7 @@ export function App({ user }) {
   }
 
   if (locked) {
-    return <LockScreen onUnlock={() => setLocked(false)} />;
+    return <LockScreen user={user} onUnlock={() => setLocked(false)} />;
   }
 
   return (
@@ -643,15 +643,24 @@ function SecurityNotice({ onDismiss }) {
   );
 }
 
-function LockScreen({ onUnlock }) {
+function LockScreen({ user, onUnlock }) {
   return (
     <div className="app lock-wrap">
       <section className="panel lock-panel">
-        <div className="centered">
-          <img src={islaLogo} alt="Isla Logo" className="logo-img big" />
-          <h1>Isla</h1>
-          <p>Secure API keys for every environment.</p>
-          <button className="unlock accent" onClick={onUnlock}>Unlock</button>
+        <div className="lock-centered">
+          <img src={islaLogo} alt="Isla Logo" className="lock-logo" />
+          <h1 className="lock-title">Isla</h1>
+          <p className="lock-subtitle">Secure API keys for every environment.</p>
+          {user && (
+            <div className="lock-user">
+              {user.photoURL
+                ? <img src={user.photoURL} alt={user.displayName || user.email} className="lock-avatar" referrerPolicy="no-referrer" />
+                : <div className="lock-avatar-placeholder">{(user.displayName || user.email || "?")[0].toUpperCase()}</div>
+              }
+              <span className="lock-user-name">{user.displayName || user.email}</span>
+            </div>
+          )}
+          <button className="lock-unlock-btn" onClick={onUnlock}>Unlock Vault</button>
         </div>
       </section>
     </div>
