@@ -51,7 +51,9 @@ input:focus-visible,
   background: #fff8f0;
   color: var(--text);
   padding: 0 10px;
-  font-weight: 600;
+  font-weight: 400;
+  font-size: 13px;
+  white-space: nowrap;
 }
 .context-bar {
   margin-top: 8px;
