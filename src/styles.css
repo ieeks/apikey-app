@@ -263,7 +263,6 @@ small, p { color: var(--text-secondary); }
   display: grid;
   gap: 10px;
   overscroll-behavior: contain;
-  touch-action: pan-y;
   max-height: 92dvh;
   overflow-y: auto;
 }
