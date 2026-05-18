@@ -20,7 +20,6 @@ const SCREENS = new Set(["workspaces", "secrets"]);
 export function App({ user }) {
   const [vaultLoaded, setVaultLoaded] = useState(false);
   const [locked, setLocked] = useState(true);
-  const [lockMode, setLockMode] = useState("face");
   const [screen, setScreen] = useState("workspaces");
   const [workspace, setWorkspace] = useState("AI");
   const [secrets, setSecrets] = useState(initialSecrets);
@@ -40,6 +39,7 @@ export function App({ user }) {
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState({ name: "", value: "", env: "prod" });
   const [revealEditValue, setRevealEditValue] = useState(false);
+  const clipboardClearRef = useRef(null);
   const importRef = useRef(null);
 
   // Load vault from Firestore on login
@@ -50,7 +50,6 @@ export function App({ user }) {
         const data = snap.data();
         if (Array.isArray(data.workspaces)) setWorkspaces(data.workspaces);
         if (Array.isArray(data.secrets)) setSecrets(data.secrets);
-        if (data.lockMode) setLockMode(data.lockMode);
         if (typeof data.hideSecurityNotice === "boolean") setHideSecurityNotice(data.hideSecurityNotice);
         if (SCREENS.has(data.screen)) setScreen(data.screen);
         if (data.workspace) setWorkspace(data.workspace);
@@ -65,7 +64,6 @@ export function App({ user }) {
     const timer = window.setTimeout(() => {
       setDoc(doc(db, "vaults", user.uid), {
         version: 1,
-        lockMode,
         screen,
         workspace,
         workspaces,
@@ -74,7 +72,7 @@ export function App({ user }) {
       });
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [lockMode, screen, workspace, workspaces, secrets, hideSecurityNotice, vaultLoaded, user]);
+  }, [screen, workspace, workspaces, secrets, hideSecurityNotice, vaultLoaded, user]);
 
   const visibleSecrets = useMemo(
     () => secrets
@@ -116,11 +114,17 @@ export function App({ user }) {
       return;
     }
     navigator.clipboard?.writeText(text);
-    showToast("✓ Copied", "success");
+    showToast("✓ Copied — clears in 30s", "success");
     setLastCopiedAt(Date.now());
+    window.clearTimeout(clipboardClearRef.current);
+    clipboardClearRef.current = window.setTimeout(() => {
+      navigator.clipboard?.writeText("");
+    }, 30_000);
   };
 
   const relock = useCallback(() => {
+    window.clearTimeout(clipboardClearRef.current);
+    navigator.clipboard?.writeText("");
     setLocked(true);
     setSelectMode(false);
     setSelected([]);
@@ -227,7 +231,7 @@ export function App({ user }) {
     showToast("Secret updated", "success");
   };
 
-  const addSecret = ({ name, value, env, workspaceName }) => {
+  const addSecret = ({ name, value, env, workspaceName, category }) => {
     if (!name.trim() || !value.trim()) {
       showToast("Name and value are required", "error");
       return;
@@ -236,7 +240,8 @@ export function App({ user }) {
       showToast("Workspace is required", "error");
       return;
     }
-    setSecrets((prev) => [...prev, { id: Date.now(), name, value, env, workspace: workspaceName, category: "AI" }]);
+    const resolvedCategory = category.trim().toUpperCase() || "GENERAL";
+    setSecrets((prev) => [...prev, { id: Date.now(), name, value, env, workspace: workspaceName, category: resolvedCategory }]);
     setWorkspaces((prev) => (prev.includes(workspaceName) ? prev : [...prev, workspaceName]));
     setWorkspace(workspaceName);
     setShowEditor(false);
@@ -324,7 +329,7 @@ export function App({ user }) {
   }
 
   if (locked) {
-    return <LockScreen mode={lockMode} setMode={setLockMode} onUnlock={() => setLocked(false)} />;
+    return <LockScreen onUnlock={() => setLocked(false)} />;
   }
 
   return (
@@ -638,77 +643,29 @@ function SecurityNotice({ onDismiss }) {
   );
 }
 
-function LockScreen({ mode, setMode, onUnlock }) {
-  const [pin, setPin] = useState("");
-  const [passphrase, setPassphrase] = useState("");
-
+function LockScreen({ onUnlock }) {
   return (
     <div className="app lock-wrap">
-      <div className="header">
-        <strong>Isla Lock</strong>
-        <nav>
-          <button className={mode === "face" ? "tab active" : "tab"} onClick={() => setMode("face")}>Face ID</button>
-          <button className={mode === "pin" ? "tab active" : "tab"} onClick={() => setMode("pin")}>PIN</button>
-          <button className={mode === "passphrase" ? "tab active" : "tab"} onClick={() => setMode("passphrase")}>Passphrase</button>
-          <button className={mode === "tap" ? "tab active" : "tab"} onClick={() => setMode("tap")}>Tap</button>
-        </nav>
-      </div>
-
       <section className="panel lock-panel">
-        {mode === "face" && (
-          <div className="centered">
-            <img src={islaLogo} alt="Isla Logo" className="logo-img" />
-            <h1>Isla</h1>
-            <p>Tap to unlock with Face ID</p>
-            <button className="unlock" onClick={onUnlock}>🔓</button>
-          </div>
-        )}
-
-        {mode === "pin" && (
-          <div className="centered">
-            <h3>Enter Passcode</h3>
-            <div className="dots">{Array.from({ length: 6 }).map((_, i) => <span key={i} className={i < pin.length ? "dot on" : "dot"} />)}</div>
-            <div className="pin-grid">
-              {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((key) => (
-                <button key={String(key)} className={key ? "pin" : "pin empty"} onClick={() => {
-                  if (!key) return;
-                  if (key === "⌫") return setPin((p) => p.slice(0, -1));
-                  if (pin.length >= 6) return;
-                  const next = `${pin}${key}`;
-                  setPin(next);
-                  if (next.length === 6) setTimeout(onUnlock, 120);
-                }}>{key}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {mode === "passphrase" && (
-          <div className="centered narrow">
-            <h3>Enter Passphrase</h3>
-            <input className="input" value={passphrase} onChange={(event) => setPassphrase(event.target.value)} />
-            <button className="primary" onClick={() => passphrase && onUnlock()}>Unlock</button>
-          </div>
-        )}
-
-        {mode === "tap" && (
-          <div className="centered">
-            <img src={islaLogo} alt="Isla Logo" className="logo-img big" />
-            <h1>Isla</h1>
-            <p>Secure API keys for every environment.</p>
-            <button className="unlock accent" onClick={onUnlock}>→</button>
-          </div>
-        )}
+        <div className="centered">
+          <img src={islaLogo} alt="Isla Logo" className="logo-img big" />
+          <h1>Isla</h1>
+          <p>Secure API keys for every environment.</p>
+          <button className="unlock accent" onClick={onUnlock}>Unlock</button>
+        </div>
       </section>
     </div>
   );
 }
 
+const PRESET_CATEGORIES = ["AI", "PAYMENTS", "INFRASTRUCTURE", "DATABASE", "AUTH"];
+
 function AddSheet({ workspaces, onClose, onSave }) {
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
   const [env, setEnv] = useState("prod");
-  const [workspaceName, setWorkspaceName] = useState(workspaces[0] || "AI");
+  const [workspaceName, setWorkspaceName] = useState(workspaces[0] || "");
+  const [category, setCategory] = useState("AI");
   const [revealValue, setRevealValue] = useState(false);
 
   return (
@@ -736,11 +693,18 @@ function AddSheet({ workspaces, onClose, onSave }) {
         <div className="row env-row">
           {envs.map((item) => <button key={item} className={env === item ? "chip active" : "chip"} onClick={() => setEnv(item)}>{item}</button>)}
         </div>
+        <label className="label">CATEGORY</label>
+        <div className="row env-row">
+          {PRESET_CATEGORIES.map((item) => (
+            <button key={item} className={category === item ? "chip active" : "chip"} onClick={() => setCategory(item)}>{item}</button>
+          ))}
+        </div>
+        <input className="input" placeholder="Custom category…" value={PRESET_CATEGORIES.includes(category) ? "" : category} onChange={(event) => setCategory(event.target.value)} aria-label="Custom category" />
         <label className="label">WORKSPACE</label>
         <input className="input" value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} aria-label="Workspace for secret" />
         <div className="row-buttons">
           <button className="outline" onClick={onClose}>Cancel</button>
-          <button className="primary" onClick={() => onSave({ name, value, env, workspaceName })} disabled={!name || !value}>Save Secret</button>
+          <button className="primary" onClick={() => onSave({ name, value, env, workspaceName, category })} disabled={!name || !value}>Save Secret</button>
         </div>
       </div>
     </div>
