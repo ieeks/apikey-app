@@ -138,6 +138,42 @@ input:focus-visible,
 .workspace-rename { font-size: 12px; color: var(--text-secondary); text-decoration: underline; }
 .workspace-rename:hover { color: var(--accent); }
 .workspace-delete:hover { color: #b91c1c; }
+
+.auth-wrap {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+.auth-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  padding: 40px 32px;
+  width: min(360px, 90vw);
+}
+.auth-logo { width: 56px; height: 56px; border-radius: 16px; }
+.auth-title { font-size: 20px; }
+.auth-hint { color: var(--text-secondary); margin: 0; font-size: 14px; }
+.auth-error { color: #b91c1c; font-size: 13px; margin: 0; text-align: center; }
+.google-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  padding: 0 20px;
+  font-weight: 600;
+  width: 100%;
+  justify-content: center;
+}
+.google-btn:hover { border-color: var(--text); }
+.signout-btn { font-size: 16px; padding: 0 8px; }
+.user-email { margin-left: auto; font-size: 11px; color: var(--text-secondary); }
 .muted-meta { font-size: 11px; color: var(--text-secondary); }
 
 .input {
