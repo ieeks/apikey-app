@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import islaLogo from "./assets/isla-logo.svg";
 
 const initialSecrets = [
@@ -48,6 +48,8 @@ export function App() {
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState({ name: "", value: "", env: "prod" });
   const [revealEditValue, setRevealEditValue] = useState(false);
+  const [deleteWorkspaceTarget, setDeleteWorkspaceTarget] = useState(null);
+  const importRef = useRef(null);
 
   const [workspaces, setWorkspaces] = useState(() => persisted?.workspaces || [...new Set(initialSecrets.map((item) => item.workspace))]);
 
@@ -103,9 +105,58 @@ export function App() {
     setShowEditor(false);
     setShowWorkspaceSheet(false);
     setRenameTarget(null);
+    setDeleteWorkspaceTarget(null);
     setEditingId(null);
     setRevealEditValue(false);
   }, []);
+
+  const exportVault = () => {
+    const data = JSON.stringify({ version: 1, workspaces, secrets }, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `isla-vault-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Vault exported");
+  };
+
+  const importVault = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!Array.isArray(data.workspaces) || !Array.isArray(data.secrets)) {
+          showToast("Invalid vault file", "error");
+          return;
+        }
+        setWorkspaces(data.workspaces);
+        setSecrets(data.secrets);
+        if (data.workspaces.length > 0) setWorkspace(data.workspaces[0]);
+        setScreen("workspaces");
+        showToast("Vault imported");
+      } catch {
+        showToast("Could not read file", "error");
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  };
+
+  const deleteWorkspace = (name) => {
+    const remaining = workspaces.filter((item) => item !== name);
+    setWorkspaces(remaining);
+    setSecrets((prev) => prev.filter((item) => item.workspace !== name));
+    if (workspace === name) {
+      if (remaining.length > 0) setWorkspace(remaining[0]);
+      setScreen("workspaces");
+    }
+    setDeleteWorkspaceTarget(null);
+    showToast("Workspace deleted");
+  };
 
   const currentWorkspaceCount = useMemo(
     () => secrets.filter((item) => item.workspace === workspace).length,
@@ -225,6 +276,7 @@ export function App() {
     const onKeyDown = (event) => {
       if (event.key !== "Escape") return;
       if (showDelete) return setShowDelete(false);
+      if (deleteWorkspaceTarget) return setDeleteWorkspaceTarget(null);
       if (renameTarget) return setRenameTarget(null);
       if (showWorkspaceSheet) return setShowWorkspaceSheet(false);
       if (showEditor) return setShowEditor(false);
@@ -235,7 +287,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [showDelete, renameTarget, showWorkspaceSheet, showEditor, editingId]);
+  }, [showDelete, deleteWorkspaceTarget, renameTarget, showWorkspaceSheet, showEditor, editingId]);
 
   useEffect(() => {
     const stateToPersist = {
@@ -291,7 +343,12 @@ export function App() {
         <section className="panel">
           <div className="row between">
             <h2>Workspaces</h2>
-            <button className="primary top-cta" aria-label="Open new workspace dialog" onClick={() => setShowWorkspaceSheet(true)}>+ New Workspace</button>
+            <div className="row">
+              <button className="link" aria-label="Export vault as JSON" onClick={exportVault}>↓ Export</button>
+              <button className="link" aria-label="Import vault from JSON" onClick={() => importRef.current?.click()}>↑ Import</button>
+              <input ref={importRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={importVault} />
+              <button className="primary top-cta" aria-label="Open new workspace dialog" onClick={() => setShowWorkspaceSheet(true)}>+ New Workspace</button>
+            </div>
           </div>
 
           <input
@@ -352,6 +409,25 @@ export function App() {
                       }}
                     >
                       Rename
+                    </span>
+                    <span
+                      className="workspace-rename workspace-delete"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Delete workspace ${item}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setDeleteWorkspaceTarget(item);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setDeleteWorkspaceTarget(item);
+                        }
+                      }}
+                    >
+                      Delete
                     </span>
                   </div>
                 </div>
@@ -492,6 +568,27 @@ export function App() {
             <div className="row-buttons">
               <button className="outline" onClick={() => setShowDelete(false)}>Cancel</button>
               <button className="primary" onClick={deleteSelected}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteWorkspaceTarget && (
+        <div className="overlay">
+          <div className="sheet">
+            <div className="handle" />
+            <h3>Delete "{deleteWorkspaceTarget}"?</h3>
+            <p>
+              This will permanently delete the workspace and all{" "}
+              {secrets.filter((item) => item.workspace === deleteWorkspaceTarget).length} secret(s) inside it.
+            </p>
+            <div className="warn">
+              <strong>Cannot be undone</strong>
+              <p>Export your vault first if you want a backup.</p>
+            </div>
+            <div className="row-buttons">
+              <button className="outline" onClick={() => setDeleteWorkspaceTarget(null)}>Cancel</button>
+              <button className="primary" onClick={() => deleteWorkspace(deleteWorkspaceTarget)}>Delete</button>
             </div>
           </div>
         </div>
