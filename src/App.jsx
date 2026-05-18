@@ -4,6 +4,18 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import islaLogo from "./assets/isla-logo.svg";
 
+function useSwipeClose(onClose, threshold = 72) {
+  const startY = useRef(null);
+  return {
+    onTouchStart: (e) => { startY.current = e.touches[0].clientY; },
+    onTouchEnd: (e) => {
+      if (startY.current === null) return;
+      if (e.changedTouches[0].clientY - startY.current > threshold) onClose();
+      startY.current = null;
+    },
+  };
+}
+
 const initialSecrets = [
   { id: 1, name: "OPENAI_API_KEY", env: "prod", workspace: "AI", value: "••••••••••••", category: "AI" },
   { id: 2, name: "OPENAI_API_KEY", env: "staging", workspace: "AI", value: "••••••••••••", category: "AI" },
@@ -41,6 +53,8 @@ export function App({ user }) {
   const [revealEditValue, setRevealEditValue] = useState(false);
   const clipboardClearRef = useRef(null);
   const importRef = useRef(null);
+  const deleteSwipeY = useRef(null);
+  const deleteWsSwipeY = useRef(null);
 
   // Load vault from Firestore on login
   useEffect(() => {
@@ -585,8 +599,8 @@ export function App({ user }) {
       )}
 
       {showDelete && (
-        <div className="overlay">
-          <div className="sheet">
+        <div className="overlay" onClick={() => setShowDelete(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => { deleteSwipeY.current = e.touches[0].clientY; }} onTouchEnd={(e) => { if (e.changedTouches[0].clientY - deleteSwipeY.current > 72) setShowDelete(false); }}>
             <div className="handle" />
             <h3>Delete {selected.length} Secret(s)?</h3>
             <p>This action cannot be undone.</p>
@@ -603,8 +617,8 @@ export function App({ user }) {
       )}
 
       {deleteWorkspaceTarget && (
-        <div className="overlay">
-          <div className="sheet">
+        <div className="overlay" onClick={() => setDeleteWorkspaceTarget(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => { deleteWsSwipeY.current = e.touches[0].clientY; }} onTouchEnd={(e) => { if (e.changedTouches[0].clientY - deleteWsSwipeY.current > 72) setDeleteWorkspaceTarget(null); }}>
             <div className="handle" />
             <h3>Delete "{deleteWorkspaceTarget}"?</h3>
             <p>
@@ -676,10 +690,11 @@ function AddSheet({ workspaces, onClose, onSave }) {
   const [workspaceName, setWorkspaceName] = useState(workspaces[0] || "");
   const [category, setCategory] = useState("AI");
   const [revealValue, setRevealValue] = useState(false);
+  const swipe = useSwipeClose(onClose);
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={(event) => event.stopPropagation()}>
+      <div className="sheet" onClick={(event) => event.stopPropagation()} {...swipe}>
         <div className="handle" />
         <h3>New Secret</h3>
         <label className="label">NAME</label>
@@ -703,7 +718,7 @@ function AddSheet({ workspaces, onClose, onSave }) {
           {envs.map((item) => <button key={item} className={env === item ? "chip active" : "chip"} onClick={() => setEnv(item)}>{item}</button>)}
         </div>
         <label className="label">CATEGORY</label>
-        <div className="row env-row">
+        <div className="chip-wrap">
           {PRESET_CATEGORIES.map((item) => (
             <button key={item} className={category === item ? "chip active" : "chip"} onClick={() => setCategory(item)}>{item}</button>
           ))}
@@ -722,10 +737,11 @@ function AddSheet({ workspaces, onClose, onSave }) {
 
 function WorkspaceSheet({ onClose, onSave }) {
   const [workspaceName, setWorkspaceName] = useState("");
+  const swipe = useSwipeClose(onClose);
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={(event) => event.stopPropagation()}>
+      <div className="sheet" onClick={(event) => event.stopPropagation()} {...swipe}>
         <div className="handle" />
         <h3>New Workspace</h3>
         <label className="label">WORKSPACE NAME</label>
@@ -741,10 +757,11 @@ function WorkspaceSheet({ onClose, onSave }) {
 
 function RenameWorkspaceSheet({ currentName, onClose, onSave }) {
   const [nextName, setNextName] = useState(currentName);
+  const swipe = useSwipeClose(onClose);
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={(event) => event.stopPropagation()}>
+      <div className="sheet" onClick={(event) => event.stopPropagation()} {...swipe}>
         <div className="handle" />
         <h3>Rename Workspace</h3>
         <label className="label">CURRENT</label>
