@@ -630,7 +630,6 @@ export function App({ user }) {
           onClose={() => setDeleteWorkspaceTarget(null)}
           onConfirm={() => deleteWorkspace(deleteWorkspaceTarget)}
         />
-        </div>
       )}
 
       {toast && <div className={toast.type === "error" ? "toast error" : "toast"}>{toast.message}</div>}
