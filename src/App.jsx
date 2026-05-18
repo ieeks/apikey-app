@@ -368,11 +368,10 @@ export function App({ user }) {
     <div className="app">
       <header className="appbar">
         <div className="brand">
-          <img src={islaLogo} alt="Isla Logo" className="brand-logo" />
-          <div>
-            <strong>Isla</strong>
-            <small>API Vault</small>
-          </div>
+          <button className="brand-logo-btn" onClick={() => setScreen("workspaces")} aria-label="Go to home">
+            <img src={islaLogo} alt="Isla Logo" className="brand-logo" />
+          </button>
+          <span className="brand-label">API Vault</span>
         </div>
 
         <nav className="segmented-nav">

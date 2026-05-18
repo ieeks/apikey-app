@@ -32,8 +32,9 @@ input:focus-visible,
   background: var(--surface);
 }
 .brand { display: flex; gap: 10px; align-items: center; }
+.brand-logo-btn { border: 0; background: transparent; padding: 0; cursor: pointer; display: flex; }
 .brand-logo { width: 34px; height: 34px; border-radius: 10px; }
-.brand small { display: block; color: var(--text-secondary); font-size: 11px; margin-top: 2px; }
+.brand-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
 .segmented-nav {
   justify-self: center;
   display: inline-flex;
