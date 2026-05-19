@@ -237,6 +237,7 @@ input:focus-visible,
 .env.staging { background: #fff8e1; }
 .env.dev { background: #e8f5e9; }
 small, p { color: var(--text-secondary); }
+small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 .fab {
   position: absolute;
